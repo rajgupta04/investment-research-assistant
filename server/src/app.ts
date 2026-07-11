@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import { ResearchRequestSchema } from '@repo/shared';
 import type { ApiErrorResponse } from '@repo/shared';
+import { investmentGraph } from './graph/graph.ts';
 
 const app = express();
 
@@ -33,11 +34,11 @@ app.get('/api/health', (_req, res) => {
 
 /**
  * POST /api/research — triggers the investment research agent.
- * Returns an SSE stream with per-node progress updates.
  *
- * Stubbed for now — the real implementation comes in the LangGraph step.
+ * Currently invokes the graph synchronously and returns the final state.
+ * Will be replaced with SSE streaming in a later step.
  */
-app.post('/api/research', (req, res) => {
+app.post('/api/research', async (req, res) => {
   // Validate request body at the trust boundary
   const parsed = ResearchRequestSchema.safeParse(req.body);
 
@@ -50,11 +51,39 @@ app.post('/api/research', (req, res) => {
     return;
   }
 
-  // Stub: return a placeholder response until we wire up the graph
-  res.json({
-    message: `Research request received for: ${parsed.data.companyName}`,
-    status: 'stub',
-  });
+  try {
+    console.log(`\n[Research] Starting analysis for: ${parsed.data.companyName}`);
+    const startTime = Date.now();
+
+    // Invoke the LangGraph with the company name as input
+    const result = await investmentGraph.invoke({
+      companyName: parsed.data.companyName,
+    });
+
+    const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`[Research] Completed in ${elapsed}s`);
+
+    // Return the final report + any errors
+    res.json({
+      report: result.finalReport,
+      errors: result.errors,
+      meta: {
+        companyName: parsed.data.companyName,
+        elapsedSeconds: parseFloat(elapsed),
+        nodeCount: 8,
+        sourceCount: result.sources?.length ?? 0,
+      },
+    });
+  } catch (error) {
+    console.error('[Research] Graph execution failed:', error);
+
+    const errorResponse: ApiErrorResponse = {
+      error: 'Research failed',
+      details:
+        error instanceof Error ? error.message : 'Unknown error during graph execution',
+    };
+    res.status(500).json(errorResponse);
+  }
 });
 
 // ---------------------------------------------------------------------------
