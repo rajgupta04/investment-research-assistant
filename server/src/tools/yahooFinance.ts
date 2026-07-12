@@ -205,8 +205,11 @@ async function getHistoricalPrices(
   ticker: string,
   timeoutMs: number = DEFAULT_TIMEOUT_MS
 ): Promise<HistoricalPricePoint[]> {
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+
   const result = await withTimeout(
-    yf.chart(ticker, { period1: '1y', interval: '1d' }),
+    yf.chart(ticker, { period1: oneYearAgo, interval: '1d' }),
     timeoutMs,
     'YahooFinance:chart'
   );
