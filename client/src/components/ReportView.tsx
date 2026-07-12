@@ -7,22 +7,16 @@ import {
 import {
   TrendingUp,
   AlertTriangle,
-  Building2,
   Shield,
-  Eye,
   FileDown,
   ExternalLink,
   Zap,
   Activity,
   BarChart3,
   Newspaper,
-  Target,
   Brain,
   ChevronRight,
-  AlertOctagon,
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
 
 interface ReportViewProps {
   report: FinalReport;
@@ -85,22 +79,12 @@ export function ReportView({ report }: ReportViewProps) {
     return { abs: last - first, pct: ((last - first) / first) * 100 };
   }, [chartData]);
 
-  const handleDownloadPdf = async () => {
-    if (!dashboardRef.current) return;
-    const canvas = await html2canvas(dashboardRef.current, {
-      backgroundColor: '#0a0a12',
-      scale: 2,
-      useCORS: true,
-      logging: false,
-    });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new jsPDF({
-      orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
-      unit: 'px',
-      format: [canvas.width, canvas.height],
-    });
-    pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-    pdf.save(`${co.name.replace(/\s+/g, '_')}_Research_Report.pdf`);
+  const handleDownloadPdf = () => {
+    // Set a temporary document title for the PDF filename
+    const originalTitle = document.title;
+    document.title = `${co.name}_Investment_Report`;
+    window.print();
+    document.title = originalTitle;
   };
 
   const getDecColor = () => {
@@ -217,6 +201,50 @@ export function ReportView({ report }: ReportViewProps) {
             <div className="p-6 text-center text-muted-foreground text-xs font-mono">Financial data unavailable for this company.</div>
           )}
         </motion.div>
+
+        {/* ── Company Profile Tile ── */}
+        <motion.div variants={itemVariants} className="terminal-panel">
+          <div className="terminal-header"><span className="dot" /><span>COMPANY PROFILE</span></div>
+          <div className="p-4 space-y-2.5">
+            {[
+              { label: 'HQ', value: co.headquarters },
+              { label: 'Founded', value: co.founded },
+              { label: 'CEO', value: co.ceo },
+              { label: 'Employees', value: co.employees },
+              { label: 'Exchange', value: co.exchange },
+            ].filter(d => d.value).map((d) => (
+              <div key={d.label} className="flex justify-between items-center text-xs">
+                <span className="font-mono text-muted-foreground/50 uppercase tracking-wider text-[9px]">{d.label}</span>
+                <span className="font-mono text-foreground/80 text-right max-w-[60%] truncate">{d.value}</span>
+              </div>
+            ))}
+            {co.description && (
+              <div className="pt-2 border-t border-border/30">
+                <p className="text-[11px] text-muted-foreground/60 leading-relaxed line-clamp-4">{co.description}</p>
+              </div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* ── Analyst Target Tile ── */}
+        {fin?.available && fin.analystTargetPrice != null && fin.currentPrice != null && (
+          <motion.div variants={itemVariants} className="terminal-panel">
+            <div className="terminal-header"><span className="dot" /><span>ANALYST TARGET</span></div>
+            <div className="p-5 text-center space-y-3">
+              <div className="text-3xl font-black font-mono text-neon-cyan">${fin.analystTargetPrice.toFixed(2)}</div>
+              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Consensus Price Target</div>
+              {(() => {
+                const upside = ((fin.analystTargetPrice - fin.currentPrice) / fin.currentPrice) * 100;
+                const isUp = upside >= 0;
+                return (
+                  <div className={`inline-block px-3 py-1 rounded text-xs font-mono font-bold ${isUp ? 'bg-neon-green/10 text-neon-green border border-neon-green/25' : 'bg-neon-red/10 text-neon-red border border-neon-red/25'}`}>
+                    {isUp ? '▲' : '▼'} {Math.abs(upside).toFixed(1)}% {isUp ? 'Upside' : 'Downside'}
+                  </div>
+                );
+              })()}
+            </div>
+          </motion.div>
+        )}
 
         {/* ── Price Chart (spans full width) ── */}
         {fin?.available && chartData.length > 0 && (

@@ -279,11 +279,17 @@ body {
    ================================================================ */
 
 @media print {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+
   body {
-    background: #0a0a0f !important;
+    background: #0a0c14 !important;
     background-image: none !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    font-size: 10pt;
   }
 
   .scanlines::after {
@@ -292,5 +298,10 @@ body {
 
   .no-print {
     display: none !important;
+  }
+
+  .terminal-panel {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 }
