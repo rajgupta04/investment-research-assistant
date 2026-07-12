@@ -45,7 +45,7 @@ app.post('/api/research', async (req, res) => {
   if (!parsed.success) {
     const errorResponse: ApiErrorResponse = {
       error: 'Invalid request',
-      details: parsed.error.issues.map((i) => i.message).join('; '),
+      details: parsed.error.issues.map((i: any) => i.message).join('; '),
     };
     res.status(400).json(errorResponse);
     return;
