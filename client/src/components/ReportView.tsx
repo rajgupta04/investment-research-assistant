@@ -1,6 +1,6 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import type { FinalReport, HistoricalPricePoint } from '@repo/shared';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -69,6 +69,13 @@ export function ReportView({ report }: ReportViewProps) {
   const [chartPeriod, setChartPeriod] = useState<TimePeriod>('1Y');
   const [viewMode, setViewMode] = useState<'grid' | 'list' | 'slides'>('grid');
   const [slideIndex, setSlideIndex] = useState(0);
+  
+  // OS Window Physics State
+  const [minimized, setMinimized] = useState(false);
+  const [maximized, setMaximized] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const constraintsRef = useRef<HTMLDivElement>(null);
+
   const dec = report.investmentDecision;
   const fin = report.financialData;
   const co = report.companyOverview;
@@ -84,6 +91,48 @@ export function ReportView({ report }: ReportViewProps) {
     const last = chartData[chartData.length - 1].close;
     return { abs: last - first, pct: ((last - first) / first) * 100 };
   }, [chartData]);
+
+  // Framer Motion Physics
+  const x = useMotionValue(0);
+  const y = useMotionValue(0);
+  const rotateX = useSpring(0, { stiffness: 300, damping: 15, mass: 0.5 });
+  const rotateY = useSpring(0, { stiffness: 300, damping: 15, mass: 0.5 });
+  const scale = useSpring(1, { stiffness: 400, damping: 20 });
+
+  const handleMinimize = useCallback(() => {
+    setMinimized(prev => !prev);
+    if (maximized) setMaximized(false);
+    scale.set(0.97);
+    setTimeout(() => scale.set(1), 150);
+  }, [maximized, scale]);
+
+  const handleMaximize = useCallback(() => {
+    setMaximized(prev => !prev);
+    if (minimized) setMinimized(false);
+    x.set(0);
+    y.set(0);
+    scale.set(1.02);
+    setTimeout(() => scale.set(1), 200);
+  }, [minimized, x, y, scale]);
+
+  const handleDragStart = useCallback(() => {
+    setIsDragging(true);
+    scale.set(1.01);
+  }, [scale]);
+
+  const handleDrag = useCallback((event: any, info: any) => {
+    const tiltX = -info.velocity.y * 0.01;
+    const tiltY = info.velocity.x * 0.01;
+    rotateX.set(Math.max(-3, Math.min(3, tiltX)));
+    rotateY.set(Math.max(-3, Math.min(3, tiltY)));
+  }, [rotateX, rotateY]);
+
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+    scale.set(1);
+    rotateX.set(0);
+    rotateY.set(0);
+  }, [scale, rotateX, rotateY]);
 
   // Keyboard navigation for slides
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -279,79 +328,189 @@ export function ReportView({ report }: ReportViewProps) {
         const safeIndex = Math.min(slideIndex, slides.length - 1);
 
         return (
-          <div className="max-w-5xl mx-auto terminal-panel shadow-2xl bg-black/40 backdrop-blur-xl border border-neon-cyan/20 rounded-xl overflow-hidden mt-4">
-            {/* Window Title Bar */}
-            <div className="flex items-center justify-between px-4 py-2.5 bg-black/60 border-b border-neon-cyan/10">
-              <div className="flex gap-2">
-                <div className="w-3 h-3 rounded-full bg-neon-red/80 shadow-[0_0_8px_oklch(0.65_0.22_25/0.5)]"></div>
-                <div className="w-3 h-3 rounded-full bg-neon-orange/80 shadow-[0_0_8px_oklch(0.78_0.18_65/0.5)]"></div>
-                <div className="w-3 h-3 rounded-full bg-neon-green/80 shadow-[0_0_8px_oklch(0.78_0.22_150/0.5)]"></div>
-              </div>
-              <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-2">
-                <Brain className="w-3 h-3 text-neon-cyan" />
-                SYS.VIEWER - {slides[safeIndex].title}
-              </div>
-              <div className="w-16 text-right font-mono text-[10px] text-neon-cyan bg-neon-cyan/10 px-2 py-0.5 rounded">
-                {safeIndex + 1} / {slides.length}
-              </div>
-            </div>
+          <div ref={constraintsRef} className="relative w-full h-[800px] flex items-center justify-center overflow-hidden perspective-[1200px] mt-4">
+            <style>{`
+              .traffic-group:hover .dot-close,
+              .traffic-group:hover .dot-minimize,
+              .traffic-group:hover .dot-maximize {
+                animation: wobble 0.5s ease-in-out;
+              }
+              .traffic-group:hover .dot-close { animation-delay: 0s; }
+              .traffic-group:hover .dot-minimize { animation-delay: 0.05s; }
+              .traffic-group:hover .dot-maximize { animation-delay: 0.1s; }
+              .traffic-group:hover .dot-icon { opacity: 1; }
+              .dot-icon { opacity: 0; transition: opacity 0.15s; }
+              @keyframes wobble {
+                0% { transform: scale(1) rotate(0deg); }
+                20% { transform: scale(1.15) rotate(-8deg); }
+                40% { transform: scale(1.05) rotate(6deg); }
+                60% { transform: scale(1.1) rotate(-4deg); }
+                80% { transform: scale(1.02) rotate(2deg); }
+                100% { transform: scale(1) rotate(0deg); }
+              }
+              .os-window { transition: width 0.3s ease, max-height 0.3s ease; }
+              .os-window.maximized {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                border-radius: 0 !important;
+              }
+              .titlebar-drag { cursor: grab; user-select: none; }
+              .titlebar-drag:active { cursor: grabbing; }
+            `}</style>
 
-            {/* Slide Content Area - Fixed Height */}
-            <div className="relative h-[600px] flex flex-col p-6 overflow-hidden bg-gradient-to-b from-transparent to-black/20">
-              <div className="flex-1 flex items-center justify-center w-full relative">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={safeIndex}
-                    initial={{ opacity: 0, scale: 0.96, filter: 'blur(8px)' }}
-                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, scale: 1.04, filter: 'blur(8px)' }}
-                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                    className="w-full flex justify-center"
-                  >
-                    {slides[safeIndex].content}
-                  </motion.div>
-                </AnimatePresence>
-              </div>
-              
-              {/* Keyboard hint */}
-              <p className="absolute bottom-4 left-0 right-0 text-center text-[9px] font-mono text-muted-foreground/30 uppercase tracking-widest pointer-events-none">
-                ← → Arrow keys or click dots to navigate
-              </p>
-            </div>
-
-            {/* Navigation Footer */}
-            <div className="flex items-center justify-between px-6 py-4 bg-black/60 border-t border-neon-cyan/10">
-              <button
-                onClick={() => setSlideIndex((i) => Math.max(0, i - 1))}
-                disabled={safeIndex === 0}
-                className="flex items-center gap-2 px-4 py-2 rounded border border-border/50 text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/50 hover:bg-neon-cyan/10 transition-all disabled:opacity-20 font-mono text-xs uppercase"
+            <motion.div
+              drag={!maximized}
+              dragConstraints={constraintsRef}
+              dragElastic={0.08}
+              dragMomentum={true}
+              dragTransition={{ bounceStiffness: 300, bounceDamping: 20 }}
+              onDragStart={handleDragStart}
+              onDrag={handleDrag}
+              onDragEnd={handleDragEnd}
+              initial={{ scale: 0.88, opacity: 0, y: 40 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.88, opacity: 0, y: 40 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 260 }}
+              className={`os-window terminal-panel shadow-2xl bg-black/40 backdrop-blur-xl border border-neon-cyan/20 overflow-hidden ${maximized ? 'maximized border-0' : 'rounded-xl w-full max-w-5xl'}`}
+              style={{
+                x,
+                y,
+                scale,
+                rotateX,
+                rotateY,
+                boxShadow: isDragging
+                  ? '0 40px 80px rgba(0,0,0,0.5), 0 0 0 1px oklch(0.82 0.18 195 / 0.3)'
+                  : '0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px oklch(0.82 0.18 195 / 0.1)',
+                transformStyle: 'preserve-3d',
+                willChange: 'transform',
+                zIndex: isDragging ? 50 : 10
+              }}
+            >
+              {/* Window Title Bar */}
+              <div 
+                className="titlebar-drag flex items-center justify-between px-4 py-2.5 bg-black/60 border-b border-neon-cyan/10"
+                onDoubleClick={handleMaximize}
               >
-                <ChevronLeft className="w-4 h-4" /> Prev
-              </button>
-
-              {/* Dot indicators */}
-              <div className="flex gap-2">
-                {slides.map((_, i) => (
+                {/* Traffic lights */}
+                <div className="traffic-group flex items-center gap-2" onMouseDown={(e) => e.stopPropagation()}>
                   <button
-                    key={i}
-                    onClick={() => setSlideIndex(i)}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      i === safeIndex
-                        ? 'bg-neon-cyan w-8 shadow-[0_0_12px_oklch(0.82_0.18_195/0.8)]'
-                        : 'bg-border/60 hover:bg-muted-foreground/50 hover:shadow-[0_0_8px_currentColor]'
-                    }`}
-                  />
-                ))}
+                    onClick={() => setViewMode('grid')}
+                    className="dot-close w-3.5 h-3.5 rounded-full bg-[#FF5F57] hover:brightness-90 transition-all flex items-center justify-center relative"
+                    title="Close"
+                  >
+                    <svg className="dot-icon w-[8px] h-[8px] absolute" viewBox="0 0 12 12" fill="none">
+                      <path d="M3 3L9 9M9 3L3 9" stroke="#4D0000" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleMinimize}
+                    className="dot-minimize w-3.5 h-3.5 rounded-full bg-[#FEBC2E] hover:brightness-90 transition-all flex items-center justify-center relative"
+                    title={minimized ? 'Expand' : 'Minimize'}
+                  >
+                    <svg className="dot-icon w-[8px] h-[8px] absolute" viewBox="0 0 12 12" fill="none">
+                      <path d="M2.5 6H9.5" stroke="#995700" strokeWidth="1.8" strokeLinecap="round" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={handleMaximize}
+                    className="dot-maximize w-3.5 h-3.5 rounded-full bg-[#28C840] hover:brightness-90 transition-all flex items-center justify-center relative"
+                    title={maximized ? 'Restore' : 'Maximize'}
+                  >
+                    <svg className="dot-icon w-[7px] h-[7px] absolute" viewBox="0 0 12 12" fill="none">
+                      {maximized ? (
+                        <>
+                          <path d="M3.5 8.5L8.5 3.5" stroke="#006500" strokeWidth="1.4" strokeLinecap="round" />
+                          <path d="M4 3.5H8.5V8" stroke="#006500" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M8 8.5H3.5V4" stroke="#006500" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                        </>
+                      ) : (
+                        <path d="M2 10L10 2M10 2H4.5M10 2V7.5" stroke="#006500" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      )}
+                    </svg>
+                  </button>
+                </div>
+                
+                <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                  <Brain className="w-3 h-3 text-neon-cyan" />
+                  SYS.VIEWER - {slides[safeIndex].title}
+                </div>
+                <div className="w-16 text-right font-mono text-[10px] text-neon-cyan bg-neon-cyan/10 px-2 py-0.5 rounded" onMouseDown={(e) => e.stopPropagation()}>
+                  {safeIndex + 1} / {slides.length}
+                </div>
               </div>
 
-              <button
-                onClick={() => setSlideIndex((i) => Math.min(slides.length - 1, i + 1))}
-                disabled={safeIndex === slides.length - 1}
-                className="flex items-center gap-2 px-4 py-2 rounded border border-border/50 text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/50 hover:bg-neon-cyan/10 transition-all disabled:opacity-20 font-mono text-xs uppercase"
+              {/* Collapsible Body */}
+              <motion.div
+                animate={{
+                  height: minimized ? 0 : 'auto',
+                  opacity: minimized ? 0 : 1,
+                }}
+                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+                className="flex flex-col flex-1 min-h-0 overflow-hidden"
               >
-                Next <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
+                {/* Slide Content Area - Responsive Height */}
+                <div 
+                  className="relative flex flex-col p-6 overflow-hidden bg-gradient-to-b from-transparent to-black/20"
+                  style={{ height: maximized ? 'calc(100vh - 120px)' : '600px' }}
+                >
+                  <div className="flex-1 flex items-center justify-center w-full relative">
+                    <AnimatePresence mode="wait">
+                      <motion.div
+                        key={safeIndex}
+                        initial={{ opacity: 0, scale: 0.96, filter: 'blur(8px)' }}
+                        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                        exit={{ opacity: 0, scale: 1.04, filter: 'blur(8px)' }}
+                        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                        className="w-full flex justify-center"
+                      >
+                        {slides[safeIndex].content}
+                      </motion.div>
+                    </AnimatePresence>
+                  </div>
+                  
+                  {/* Keyboard hint */}
+                  <p className="absolute bottom-4 left-0 right-0 text-center text-[9px] font-mono text-muted-foreground/30 uppercase tracking-widest pointer-events-none">
+                    ← → Arrow keys or click dots to navigate
+                  </p>
+                </div>
+
+                {/* Navigation Footer */}
+                <div className="flex items-center justify-between px-6 py-4 bg-black/60 border-t border-neon-cyan/10" onMouseDown={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => setSlideIndex((i) => Math.max(0, i - 1))}
+                    disabled={safeIndex === 0}
+                    className="flex items-center gap-2 px-4 py-2 rounded border border-border/50 text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/50 hover:bg-neon-cyan/10 transition-all disabled:opacity-20 font-mono text-xs uppercase cursor-pointer"
+                  >
+                    <ChevronLeft className="w-4 h-4" /> Prev
+                  </button>
+
+                  {/* Dot indicators */}
+                  <div className="flex gap-2">
+                    {slides.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSlideIndex(i)}
+                        className={`w-2 h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                          i === safeIndex
+                            ? 'bg-neon-cyan w-8 shadow-[0_0_12px_oklch(0.82_0.18_195/0.8)]'
+                            : 'bg-border/60 hover:bg-muted-foreground/50 hover:shadow-[0_0_8px_currentColor]'
+                        }`}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => setSlideIndex((i) => Math.min(slides.length - 1, i + 1))}
+                    disabled={safeIndex === slides.length - 1}
+                    className="flex items-center gap-2 px-4 py-2 rounded border border-border/50 text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/50 hover:bg-neon-cyan/10 transition-all disabled:opacity-20 font-mono text-xs uppercase cursor-pointer"
+                  >
+                    Next <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
           </div>
         );
       })()}
