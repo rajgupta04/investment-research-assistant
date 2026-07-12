@@ -1,5 +1,6 @@
-import type { AgentStateType, AgentStateUpdate } from '../graph/state.ts';
-import type { FinalReport } from '@repo/shared';
+import type { AgentStateType, AgentStateUpdate } from '../graph/state.js';
+import type { FinalReport, EvidenceItem, Source } from '@repo/shared';
+import { generateText } from '../tools/llm.js';
 
 /**
  * Node 8: generateReport
@@ -14,12 +15,51 @@ export async function generateReport(
   state: AgentStateType
 ): Promise<AgentStateUpdate> {
   console.log(`[generateReport] Compiling report for: ${state.companyName}`);
-
   const now = new Date().toISOString();
 
-  // STUB: Will be replaced with Gemini LLM call for narrative generation
+  let executiveSummary = 'Executive summary generation failed.';
+  let financialAnalysis = 'Financial analysis generation failed.';
+
+  try {
+    const sysPrompt = `You are an expert financial writer. Write clear, concise, and professional summaries for an investment report.`;
+    
+    // Generate Executive Summary
+    const execPrompt = `Summarize the following investment research into a 2-3 paragraph executive summary:
+Recommendation: ${state.investmentDecision?.recommendation}
+Company: ${state.companyName}
+Business Quality: ${state.businessQuality?.overallScore}/10
+Key Risks: ${state.riskAnalysis?.overallRiskLevel}
+Thesis: ${state.investmentDecision?.thesisSummary}`;
+    executiveSummary = await generateText(execPrompt, sysPrompt);
+
+    // Generate Financial Analysis narrative
+    if (state.financialData?.available) {
+      const finPrompt = `Based on the following financial data for ${state.companyName}, write a 2-3 paragraph analysis of their financial health, valuation, and growth:
+${JSON.stringify(state.financialData, null, 2)}`;
+      financialAnalysis = await generateText(finPrompt, sysPrompt);
+    } else {
+      financialAnalysis = 'Financial data was unavailable for this analysis.';
+    }
+  } catch (error) {
+    console.warn(`[generateReport] ✗ LLM generation failed:`, error);
+  }
+
+  // Deduplicate and collect all sources
+  const uniqueSourcesMap = new Map<string, Source>();
+  state.sources.forEach(s => uniqueSourcesMap.set(s.url, s));
+  const uniqueSources = Array.from(uniqueSourcesMap.values());
+
+  // Collect all evidence from all nodes
+  const allEvidence: EvidenceItem[] = [
+    ...(state.sentimentAnalysis?.evidence ?? []),
+    ...(state.businessQuality?.evidence ?? []),
+    ...(state.businessQuality?.opportunities.flatMap(o => o.evidence) ?? []),
+    ...(state.riskAnalysis?.risks.flatMap(r => r.evidence) ?? []),
+  ];
+
+  // Assemble the final report
   const report: FinalReport = {
-    executiveSummary: `Stub executive summary for ${state.companyName}. Full analysis pending implementation.`,
+    executiveSummary,
     companyOverview: state.companyOverview ?? {
       name: state.companyName,
       ticker: null,
@@ -33,11 +73,9 @@ export async function generateReport(
       employees: null,
       sources: [],
     },
-    financialAnalysis: state.financialData?.available
-      ? 'Stub financial analysis.'
-      : 'Financial data was unavailable for this analysis.',
+    financialAnalysis,
     newsSummary: state.latestNews?.articles.length
-      ? `Found ${state.latestNews.articles.length} articles.`
+      ? `Analyzed ${state.latestNews.articles.length} recent articles.`
       : 'No recent news articles were found.',
     opportunities: state.businessQuality?.opportunities ?? [],
     risks: state.riskAnalysis?.risks ?? [],
@@ -54,8 +92,8 @@ export async function generateReport(
       thesisSummary: 'Investment decision could not be generated.',
       reasoning: ['Decision node did not produce output.'],
     },
-    evidenceCatalog: [],
-    sources: state.sources ?? [],
+    evidenceCatalog: allEvidence,
+    sources: uniqueSources,
     reasoningTrace: [
       { node: 'researchCompany', summary: 'Researched company identity and overview.', timestamp: now },
       { node: 'collectFinancialData', summary: 'Collected financial metrics.', timestamp: now },
