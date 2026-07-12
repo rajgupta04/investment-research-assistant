@@ -1,8 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import { ResearchRequestSchema } from '@repo/shared';
-import type { ApiErrorResponse } from '@repo/shared';
-import { investmentGraph } from './graph/graph.ts';
+import type { ApiErrorResponse, SSENodeComplete, SSEComplete, SSEFatalError } from '@repo/shared';
+import { investmentGraph } from './graph/graph.js';
 
 const app = express();
 
@@ -33,56 +33,84 @@ app.get('/api/health', (_req, res) => {
 });
 
 /**
- * POST /api/research — triggers the investment research agent.
+ * GET /api/research/stream — triggers the investment research agent with SSE.
  *
- * Currently invokes the graph synchronously and returns the final state.
- * Will be replaced with SSE streaming in a later step.
+ * Query params:
+ * - companyName (string): The company to research
  */
-app.post('/api/research', async (req, res) => {
-  // Validate request body at the trust boundary
-  const parsed = ResearchRequestSchema.safeParse(req.body);
-
-  if (!parsed.success) {
+app.get('/api/research/stream', async (req, res) => {
+  // Validate query parameter
+  const companyName = req.query.companyName as string;
+  if (!companyName || companyName.trim() === '') {
     const errorResponse: ApiErrorResponse = {
       error: 'Invalid request',
-      details: parsed.error.issues.map((i: any) => i.message).join('; '),
+      details: 'companyName query parameter is required',
     };
     res.status(400).json(errorResponse);
     return;
   }
 
-  try {
-    console.log(`\n[Research] Starting analysis for: ${parsed.data.companyName}`);
-    const startTime = Date.now();
+  // Setup Server-Sent Events headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
 
-    // Invoke the LangGraph with the company name as input
-    const result = await investmentGraph.invoke({
-      companyName: parsed.data.companyName,
-    });
+  console.log(`\n[Research SSE] Starting analysis for: ${companyName}`);
+  const startTime = Date.now();
+
+  try {
+    // Invoke the LangGraph with streamMode: 'values' to get state after each node
+    const stream = await investmentGraph.stream(
+      { companyName: companyName.trim() },
+      { streamMode: 'values' }
+    );
+
+    let finalState: any = null;
+    const seenNodes = new Set<string>();
+
+    for await (const state of stream) {
+      finalState = state;
+      const node = state.currentNode;
+
+      // Yield node_complete event for every new node that finishes
+      if (node && !seenNodes.has(node)) {
+        seenNodes.add(node);
+        const event: SSENodeComplete = {
+          type: 'node_complete',
+          node: node,
+          timestamp: new Date().toISOString(),
+        };
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    }
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
-    console.log(`[Research] Completed in ${elapsed}s`);
+    console.log(`[Research SSE] Completed in ${elapsed}s`);
 
-    // Return the final report + any errors
-    res.json({
-      report: result.finalReport,
-      errors: result.errors,
-      meta: {
-        companyName: parsed.data.companyName,
-        elapsedSeconds: parseFloat(elapsed),
-        nodeCount: 8,
-        sourceCount: result.sources?.length ?? 0,
-      },
-    });
+    // Yield final complete event
+    if (finalState && finalState.finalReport) {
+      const completeEvent: SSEComplete = {
+        type: 'complete',
+        report: finalState.finalReport,
+        errors: finalState.errors || [],
+        timestamp: new Date().toISOString(),
+      };
+      res.write(`data: ${JSON.stringify(completeEvent)}\n\n`);
+    } else {
+      throw new Error('Graph completed but no final report was generated.');
+    }
+
   } catch (error) {
-    console.error('[Research] Graph execution failed:', error);
-
-    const errorResponse: ApiErrorResponse = {
-      error: 'Research failed',
-      details:
-        error instanceof Error ? error.message : 'Unknown error during graph execution',
+    console.error('[Research SSE] Graph execution failed:', error);
+    const fatalEvent: SSEFatalError = {
+      type: 'fatal_error',
+      message: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString(),
     };
-    res.status(500).json(errorResponse);
+    res.write(`data: ${JSON.stringify(fatalEvent)}\n\n`);
+  } finally {
+    res.end();
   }
 });
 
