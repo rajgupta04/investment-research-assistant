@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
-import { ResearchRequestSchema } from '@repo/shared';
+import { ResearchRequestSchema, GRAPH_NODE_ORDER } from '@repo/shared';
 import type { ApiErrorResponse, SSENodeComplete, SSEComplete, SSEFatalError } from '@repo/shared';
 import { investmentGraph } from './graph/graph.js';
+import { reportCache } from './utils/cache.js';
 
 const app = express();
 
@@ -29,11 +30,15 @@ app.get('/api/health', (_req, res) => {
     status: 'ok',
     timestamp: new Date().toISOString(),
     sharedTypesLoaded: typeof ResearchRequestSchema !== 'undefined',
+    cacheSize: reportCache.size,
   });
 });
 
 /**
  * GET /api/research/stream — triggers the investment research agent with SSE.
+ *
+ * If a cached report exists for the same company (within TTL), it replays
+ * the SSE events instantly from cache — zero API calls, zero cost.
  *
  * Query params:
  * - companyName (string): The company to research
@@ -56,13 +61,43 @@ app.get('/api/research/stream', async (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  console.log(`\n[Research SSE] Starting analysis for: ${companyName}`);
+  const trimmedName = companyName.trim();
+
+  // ── Check cache first ────────────────────────────────────────
+  const cached = reportCache.get(trimmedName);
+  if (cached) {
+    console.log(`\n[Research SSE] Cache hit for "${trimmedName}" — replaying events instantly`);
+
+    // Replay node_complete events with small delays for a smooth UI experience
+    for (const node of GRAPH_NODE_ORDER) {
+      const event: SSENodeComplete = {
+        type: 'node_complete',
+        node: node,
+        timestamp: new Date().toISOString(),
+      };
+      res.write(`data: ${JSON.stringify(event)}\n\n`);
+      // Small artificial delay so the frontend progress bar feels natural
+      await new Promise((r) => setTimeout(r, 80));
+    }
+
+    const completeEvent: SSEComplete = {
+      type: 'complete',
+      report: cached.report,
+      errors: cached.errors,
+      timestamp: new Date().toISOString(),
+    };
+    res.write(`data: ${JSON.stringify(completeEvent)}\n\n`);
+    res.end();
+    return;
+  }
+
+  // ── Cache miss — run the full graph ──────────────────────────
+  console.log(`\n[Research SSE] Cache miss for "${trimmedName}" — running full graph`);
   const startTime = Date.now();
 
   try {
-    // Invoke the LangGraph with streamMode: 'values' to get state after each node
     const stream = await investmentGraph.stream(
-      { companyName: companyName.trim() },
+      { companyName: trimmedName },
       { streamMode: 'values' }
     );
 
@@ -73,7 +108,6 @@ app.get('/api/research/stream', async (req, res) => {
       finalState = state;
       const node = state.currentNode;
 
-      // Yield node_complete event for every new node that finishes
       if (node && !seenNodes.has(node)) {
         seenNodes.add(node);
         const event: SSENodeComplete = {
@@ -88,8 +122,10 @@ app.get('/api/research/stream', async (req, res) => {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`[Research SSE] Completed in ${elapsed}s`);
 
-    // Yield final complete event
     if (finalState && finalState.finalReport) {
+      // ── Store in cache before responding ──────────────────────
+      reportCache.set(trimmedName, finalState.finalReport, finalState.errors || []);
+
       const completeEvent: SSEComplete = {
         type: 'complete',
         report: finalState.finalReport,
