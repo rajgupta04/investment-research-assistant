@@ -1,53 +1,62 @@
 @import 'tailwindcss';
 
 /* ================================================================
-   Design tokens — CSS custom properties
-   shadcn/ui-compatible naming convention (HSL values)
+   CYBERPUNK INVESTMENT TERMINAL — Design System
    ================================================================ */
 
 @theme {
-  /* Dark-first premium palette */
-  --color-background: oklch(0.145 0 0);
-  --color-foreground: oklch(0.985 0 0);
+  /* Deep space black backgrounds */
+  --color-background: oklch(0.08 0.01 250);
+  --color-foreground: oklch(0.92 0 0);
 
-  --color-card: oklch(0.205 0 0);
-  --color-card-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.12 0.01 250);
+  --color-card-foreground: oklch(0.92 0 0);
 
-  --color-primary: oklch(0.646 0.222 41.116);
-  --color-primary-foreground: oklch(0.985 0 0);
+  /* Neon Cyan primary accent */
+  --color-primary: oklch(0.82 0.18 195);
+  --color-primary-foreground: oklch(0.12 0 0);
 
-  --color-secondary: oklch(0.269 0 0);
-  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-secondary: oklch(0.16 0.01 250);
+  --color-secondary-foreground: oklch(0.85 0 0);
 
-  --color-muted: oklch(0.269 0 0);
-  --color-muted-foreground: oklch(0.708 0 0);
+  --color-muted: oklch(0.18 0.005 250);
+  --color-muted-foreground: oklch(0.55 0 0);
 
-  --color-accent: oklch(0.269 0 0);
-  --color-accent-foreground: oklch(0.985 0 0);
+  --color-accent: oklch(0.20 0.015 250);
+  --color-accent-foreground: oklch(0.92 0 0);
 
-  --color-destructive: oklch(0.396 0.141 25.723);
-  --color-destructive-foreground: oklch(0.637 0.237 25.331);
+  --color-destructive: oklch(0.55 0.22 25);
+  --color-destructive-foreground: oklch(0.75 0.20 25);
 
-  --color-border: oklch(0.269 0 0);
-  --color-input: oklch(0.269 0 0);
-  --color-ring: oklch(0.556 0.215 37.717);
+  --color-border: oklch(0.22 0.015 250);
+  --color-input: oklch(0.15 0.01 250);
+  --color-ring: oklch(0.82 0.18 195);
 
-  /* Semantic colors for investment signals */
-  --color-invest: oklch(0.627 0.194 149.214);
-  --color-watchlist: oklch(0.769 0.188 70.08);
-  --color-pass: oklch(0.637 0.237 25.331);
+  /* Investment signal colors */
+  --color-invest: oklch(0.75 0.22 155);
+  --color-watchlist: oklch(0.82 0.18 85);
+  --color-pass: oklch(0.65 0.22 25);
+
+  /* Neon glow palette */
+  --color-neon-cyan: oklch(0.82 0.18 195);
+  --color-neon-green: oklch(0.78 0.22 150);
+  --color-neon-orange: oklch(0.78 0.18 65);
+  --color-neon-red: oklch(0.65 0.22 25);
+  --color-neon-purple: oklch(0.65 0.22 300);
+  --color-neon-blue: oklch(0.70 0.18 250);
 
   /* Layout */
-  --radius-lg: 0.75rem;
-  --radius-md: 0.5rem;
-  --radius-sm: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-md: 0.375rem;
+  --radius-sm: 0.25rem;
 
   /* Typography */
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 }
 
 /* ================================================================
-   Base styles
+   Base Styles
    ================================================================ */
 
 * {
@@ -68,47 +77,188 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100dvh;
+  /* Subtle grid pattern background */
+  background-image:
+    linear-gradient(oklch(0.82 0.18 195 / 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(0.82 0.18 195 / 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
 /* ================================================================
-   Utility classes for investment recommendation badges
+   Investment Decision Badges
    ================================================================ */
 
 .badge-invest {
-  background-color: oklch(0.627 0.194 149.214 / 0.15);
+  background: oklch(0.75 0.22 155 / 0.12);
   color: var(--color-invest);
-  border: 1px solid oklch(0.627 0.194 149.214 / 0.3);
+  border: 1px solid oklch(0.75 0.22 155 / 0.4);
+  box-shadow: 0 0 15px oklch(0.75 0.22 155 / 0.15), inset 0 0 15px oklch(0.75 0.22 155 / 0.05);
 }
 
 .badge-watchlist {
-  background-color: oklch(0.769 0.188 70.08 / 0.15);
+  background: oklch(0.82 0.18 85 / 0.12);
   color: var(--color-watchlist);
-  border: 1px solid oklch(0.769 0.188 70.08 / 0.3);
+  border: 1px solid oklch(0.82 0.18 85 / 0.4);
+  box-shadow: 0 0 15px oklch(0.82 0.18 85 / 0.15), inset 0 0 15px oklch(0.82 0.18 85 / 0.05);
 }
 
 .badge-pass {
-  background-color: oklch(0.637 0.237 25.331 / 0.15);
+  background: oklch(0.65 0.22 25 / 0.12);
   color: var(--color-pass);
-  border: 1px solid oklch(0.637 0.237 25.331 / 0.3);
+  border: 1px solid oklch(0.65 0.22 25 / 0.4);
+  box-shadow: 0 0 15px oklch(0.65 0.22 25 / 0.15), inset 0 0 15px oklch(0.65 0.22 25 / 0.05);
 }
 
 /* ================================================================
-   Glassmorphism card base
+   Terminal Panel — The core building block
    ================================================================ */
 
+.terminal-panel {
+  background: oklch(0.10 0.01 250 / 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid oklch(0.82 0.18 195 / 0.12);
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+}
+
+.terminal-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, oklch(0.82 0.18 195 / 0.5) 50%, transparent 100%);
+}
+
+/* Panel with header bar */
+.terminal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem;
+  border-bottom: 1px solid oklch(0.82 0.18 195 / 0.1);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: oklch(0.82 0.18 195 / 0.7);
+}
+
+.terminal-header .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-neon-cyan);
+  box-shadow: 0 0 6px var(--color-neon-cyan);
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Glass card (legacy support) */
 .glass-card {
-  background: oklch(0.205 0 0 / 0.6);
-  backdrop-filter: blur(12px);
-  border: 1px solid oklch(1 0 0 / 0.08);
-  border-radius: var(--radius-lg);
+  background: oklch(0.10 0.01 250 / 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid oklch(0.82 0.18 195 / 0.12);
+  border-radius: var(--radius-md);
 }
 
 /* ================================================================
-   Scrollbar styling
+   Neon Glow Effects
+   ================================================================ */
+
+.glow-cyan {
+  box-shadow: 0 0 20px oklch(0.82 0.18 195 / 0.15),
+              0 0 40px oklch(0.82 0.18 195 / 0.05);
+}
+
+.glow-green {
+  box-shadow: 0 0 20px oklch(0.75 0.22 155 / 0.15),
+              0 0 40px oklch(0.75 0.22 155 / 0.05);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px oklch(0.82 0.18 195 / 0.5),
+               0 0 30px oklch(0.82 0.18 195 / 0.2);
+}
+
+.text-glow-green {
+  text-shadow: 0 0 10px oklch(0.75 0.22 155 / 0.5),
+               0 0 30px oklch(0.75 0.22 155 / 0.2);
+}
+
+/* ================================================================
+   Scanline Overlay
+   ================================================================ */
+
+.scanlines::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0px,
+    oklch(0 0 0 / 0.015) 1px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+/* ================================================================
+   Animations
+   ================================================================ */
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes flicker {
+  0%, 100% { opacity: 1; }
+  92% { opacity: 1; }
+  93% { opacity: 0.8; }
+  94% { opacity: 1; }
+  96% { opacity: 0.9; }
+  97% { opacity: 1; }
+}
+
+@keyframes scan-line {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+@keyframes data-stream {
+  0% { background-position: 0% 0%; }
+  100% { background-position: 0% 100%; }
+}
+
+@keyframes border-glow {
+  0%, 100% { border-color: oklch(0.82 0.18 195 / 0.15); }
+  50% { border-color: oklch(0.82 0.18 195 / 0.35); }
+}
+
+.animate-flicker {
+  animation: flicker 4s ease-in-out infinite;
+}
+
+.animate-border-glow {
+  animation: border-glow 3s ease-in-out infinite;
+}
+
+/* ================================================================
+   Scrollbar
    ================================================================ */
 
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 4px;
 }
 
 ::-webkit-scrollbar-track {
@@ -116,10 +266,31 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.4 0 0);
-  border-radius: 3px;
+  background: oklch(0.82 0.18 195 / 0.3);
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.5 0 0);
+  background: oklch(0.82 0.18 195 / 0.5);
+}
+
+/* ================================================================
+   Print / PDF Styles
+   ================================================================ */
+
+@media print {
+  body {
+    background: #0a0a0f !important;
+    background-image: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .scanlines::after {
+    display: none !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
 }
