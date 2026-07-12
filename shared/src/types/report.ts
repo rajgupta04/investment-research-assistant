@@ -74,6 +74,15 @@ export const FinancialTimeSeriesPointSchema = z.object({
 });
 export type FinancialTimeSeriesPoint = z.infer<typeof FinancialTimeSeriesPointSchema>;
 
+export const HistoricalPricePointSchema = z.object({
+  date: z.string(),
+  close: z.number(),
+  high: z.number(),
+  low: z.number(),
+  volume: z.number(),
+});
+export type HistoricalPricePoint = z.infer<typeof HistoricalPricePointSchema>;
+
 export const FinancialDataSchema = z.object({
   available: z.boolean(),
   currentPrice: z.number().nullable(),
@@ -91,6 +100,7 @@ export const FinancialDataSchema = z.object({
   analystTargetPrice: z.number().nullable(),
   revenueHistory: z.array(FinancialTimeSeriesPointSchema),
   earningsHistory: z.array(FinancialTimeSeriesPointSchema),
+  historicalPrices: z.array(HistoricalPricePointSchema).default([]),
   sources: z.array(SourceSchema),
 });
 export type FinancialData = z.infer<typeof FinancialDataSchema>;
@@ -191,6 +201,7 @@ export type ReasoningTraceStep = z.infer<typeof ReasoningTraceStepSchema>;
 export const FinalReportSchema = z.object({
   executiveSummary: z.string(),
   companyOverview: CompanyOverviewSchema,
+  financialData: FinancialDataSchema.nullable().default(null),
   financialAnalysis: z.string(),
   newsSummary: z.string(),
   opportunities: z.array(OpportunitySchema),

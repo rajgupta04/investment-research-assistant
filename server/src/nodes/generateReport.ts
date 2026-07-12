@@ -73,6 +73,7 @@ ${JSON.stringify(state.financialData, null, 2)}`;
       employees: null,
       sources: [],
     },
+    financialData: state.financialData ?? null,
     financialAnalysis,
     newsSummary: state.latestNews?.articles.length
       ? `Analyzed ${state.latestNews.articles.length} recent articles.`

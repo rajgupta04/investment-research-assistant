@@ -1,5 +1,5 @@
 import YahooFinance from 'yahoo-finance2';
-import type { FinancialData, Source, FinancialTimeSeriesPoint } from '@repo/shared';
+import type { FinancialData, Source, FinancialTimeSeriesPoint, HistoricalPricePoint } from '@repo/shared';
 import { withTimeout } from '../utils/retry.ts';
 
 // ============================================================
@@ -73,6 +73,7 @@ export async function getFinancialData(
       analystTargetPrice: financial?.targetMeanPrice ?? null,
       revenueHistory: [], // Will try to fill from earningsTrend
       earningsHistory: [], // Will try to fill from earningsTrend
+      historicalPrices: [], // Will fill from chart() call below
       sources: [],
     };
 
@@ -97,6 +98,14 @@ export async function getFinancialData(
         retrievedAt: new Date().toISOString(),
       },
     ];
+
+    // Fetch 1-year historical prices for charts
+    try {
+      data.historicalPrices = await getHistoricalPrices(ticker, timeoutMs);
+      console.log(`[YahooFinance] ✓ Got ${data.historicalPrices.length} historical price points for ${ticker}`);
+    } catch (histErr) {
+      console.warn(`[YahooFinance] ✗ Historical prices failed for ${ticker}:`, histErr instanceof Error ? histErr.message : histErr);
+    }
 
     console.log(
       `[YahooFinance] ✓ Got data for ${ticker}: ` +
@@ -184,6 +193,33 @@ function createUnavailableFinancialData(): FinancialData {
     analystTargetPrice: null,
     revenueHistory: [],
     earningsHistory: [],
+    historicalPrices: [],
     sources: [],
   };
+}
+
+/**
+ * Fetch 1-year historical daily prices using yahoo-finance2 chart().
+ */
+async function getHistoricalPrices(
+  ticker: string,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<HistoricalPricePoint[]> {
+  const result = await withTimeout(
+    yf.chart(ticker, { period1: '1y', interval: '1d' }),
+    timeoutMs,
+    'YahooFinance:chart'
+  );
+
+  if (!result.quotes || result.quotes.length === 0) return [];
+
+  return result.quotes
+    .filter((q: any) => q.close != null && q.date != null)
+    .map((q: any): HistoricalPricePoint => ({
+      date: new Date(q.date).toISOString().split('T')[0],
+      close: q.close,
+      high: q.high ?? q.close,
+      low: q.low ?? q.close,
+      volume: q.volume ?? 0,
+    }));
 }
