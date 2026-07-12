@@ -97,12 +97,12 @@ export default function App() {
       <header className="sticky top-0 z-50 backdrop-blur-xl bg-background/80 border-b border-border/50 px-4 py-2.5 flex items-center justify-between no-print">
         <div className="flex items-center gap-2.5">
           <Cpu className="w-5 h-5 text-neon-cyan" style={{ filter: 'drop-shadow(0 0 4px oklch(0.82 0.18 195 / 0.5))' }} />
-          <span className="font-mono text-xs font-bold uppercase tracking-[0.15em] text-neon-cyan/80">
+          <span className="font-mono text-sm md:text-base font-bold uppercase tracking-[0.15em] text-neon-cyan/90">
             Investment Terminal
           </span>
-          <span className="text-[9px] font-mono text-muted-foreground/40 border border-border/50 rounded px-1.5 py-0.5">v1.0</span>
+          <span className="text-[10px] md:text-xs font-mono text-muted-foreground/60 border border-border/50 rounded px-1.5 py-0.5">v1.0</span>
         </div>
-        <div className="flex items-center gap-2 text-[9px] font-mono text-muted-foreground/40 uppercase tracking-wider">
+        <div className="flex items-center gap-2 text-[10px] md:text-xs font-mono text-muted-foreground/60 uppercase tracking-wider">
           <span className="hidden sm:inline">Powered by LangGraph + Gemini</span>
           <span className="w-1.5 h-1.5 rounded-full bg-neon-green" style={{ boxShadow: '0 0 6px oklch(0.78 0.22 150)' }} />
           <span className="text-neon-green/60">Online</span>
@@ -157,7 +157,7 @@ export default function App() {
                 <h2 className="text-2xl font-bold font-mono text-neon-cyan text-glow-cyan">
                   SCANNING: {companyName.toUpperCase()}
                 </h2>
-                <p className="text-xs font-mono text-muted-foreground/40 mt-1">Autonomous research pipeline active</p>
+                <p className="text-sm font-mono text-muted-foreground/60 mt-1">Autonomous research pipeline active</p>
               </div>
               <SearchForm onSearch={handleSearch} isLoading={true} />
               <ProgressView completedNodes={completedNodes} error={error} />
@@ -194,7 +194,7 @@ export default function App() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
-              <div className="flex items-center justify-between mb-6 max-w-[1600px] mx-auto px-2">
+              <div className="flex items-center justify-between mb-6 w-full max-w-[1920px] mx-auto px-2">
                 <button
                   onClick={handleReset}
                   className="no-print flex items-center gap-2 px-3 py-1.5 rounded border border-border/50 text-xs font-mono text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/25 transition-all"

@@ -471,7 +471,7 @@ export function ReportView({ report }: ReportViewProps) {
                   </div>
                   
                   {/* Keyboard hint */}
-                  <p className="absolute bottom-4 left-0 right-0 text-center text-[9px] font-mono text-muted-foreground/30 uppercase tracking-widest pointer-events-none">
+                  <p className="absolute bottom-4 left-0 right-0 text-center text-[11px] font-mono text-muted-foreground/60 uppercase tracking-widest pointer-events-none">
                     ← → Arrow keys or click dots to navigate
                   </p>
                 </div>
@@ -524,7 +524,7 @@ export function ReportView({ report }: ReportViewProps) {
         animate="visible"
         className={viewMode === 'grid'
           ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3'
-          : 'flex flex-col gap-3 max-w-4xl mx-auto'
+          : 'flex flex-col gap-4 w-full max-w-6xl mx-auto'
         }
       >
 
@@ -533,7 +533,7 @@ export function ReportView({ report }: ReportViewProps) {
           <div className="terminal-header"><span className="dot" /><span>VERDICT</span></div>
           <div className="p-5 text-center space-y-3">
             <div className={`text-4xl font-black font-mono tracking-tight ${decStyle.text} ${decStyle.glow}`}>{dec.recommendation}</div>
-            <div className="text-xs text-muted-foreground font-mono uppercase tracking-wider">Confidence</div>
+            <div className="text-sm text-muted-foreground/90 font-mono uppercase tracking-wider">Confidence</div>
             <div className="relative mx-auto w-24 h-24">
               <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                 <circle cx="50" cy="50" r="42" fill="none" stroke="oklch(0.22 0.015 250)" strokeWidth="6" />
@@ -557,7 +557,7 @@ export function ReportView({ report }: ReportViewProps) {
               { label: 'Evidence Strength', value: dec.confidence.evidenceStrength, max: 20 },
             ].map((d) => (
               <div key={d.label}>
-                <div className="flex justify-between text-[10px] font-mono text-muted-foreground mb-1">
+                <div className="flex justify-between text-xs font-mono text-muted-foreground/90 mb-1">
                   <span className="uppercase tracking-wider">{d.label}</span>
                   <span className="text-neon-cyan">{d.value}/{d.max}</span>
                 </div>
@@ -589,8 +589,8 @@ export function ReportView({ report }: ReportViewProps) {
                 { label: '52W Low', value: numFmt(fin.fiftyTwoWeekLow, '$') },
               ].map((m) => (
                 <div key={m.label} className="p-2.5 bg-secondary/30 rounded border border-border/40 text-center">
-                  <div className="text-[8px] font-mono uppercase tracking-widest text-muted-foreground/60 mb-0.5">{m.label}</div>
-                  <div className="text-sm font-bold font-mono text-foreground">{m.value}</div>
+                  <div className="text-[10px] md:text-[11px] font-mono uppercase tracking-widest text-muted-foreground/80 mb-0.5">{m.label}</div>
+                  <div className="text-base font-bold font-mono text-foreground">{m.value}</div>
                 </div>
               ))}
             </div>
@@ -611,13 +611,13 @@ export function ReportView({ report }: ReportViewProps) {
               { label: 'Exchange', value: co.exchange },
             ].filter(d => d.value).map((d) => (
               <div key={d.label} className="flex justify-between items-center text-xs">
-                <span className="font-mono text-muted-foreground/50 uppercase tracking-wider text-[9px]">{d.label}</span>
-                <span className="font-mono text-foreground/80 text-right max-w-[60%] truncate">{d.value}</span>
+                <span className="font-mono text-muted-foreground/80 uppercase tracking-wider text-[11px]">{d.label}</span>
+                <span className="font-mono text-foreground text-right max-w-[60%] truncate">{d.value}</span>
               </div>
             ))}
             {co.description && (
               <div className="pt-2 border-t border-border/30">
-                <p className="text-[11px] text-muted-foreground/60 leading-relaxed line-clamp-4">{co.description}</p>
+                <p className="text-xs text-muted-foreground/80 leading-relaxed line-clamp-4">{co.description}</p>
               </div>
             )}
           </div>
@@ -629,7 +629,7 @@ export function ReportView({ report }: ReportViewProps) {
             <div className="terminal-header"><span className="dot" /><span>ANALYST TARGET</span></div>
             <div className="p-5 text-center space-y-3">
               <div className="text-3xl font-black font-mono text-neon-cyan">${fin.analystTargetPrice.toFixed(2)}</div>
-              <div className="text-[10px] font-mono text-muted-foreground uppercase tracking-wider">Consensus Price Target</div>
+              <div className="text-xs font-mono text-muted-foreground/90 uppercase tracking-wider">Consensus Price Target</div>
               {(() => {
                 const upside = ((fin.analystTargetPrice - fin.currentPrice) / fin.currentPrice) * 100;
                 const isUp = upside >= 0;
@@ -660,10 +660,10 @@ export function ReportView({ report }: ReportViewProps) {
                   <button
                     key={p}
                     onClick={() => setChartPeriod(p)}
-                    className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-all ${
+                    className={`px-3 py-1 rounded text-[11px] font-mono font-bold uppercase tracking-wider transition-all ${
                       chartPeriod === p
                         ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40'
-                        : 'text-muted-foreground/40 hover:text-muted-foreground/70 border border-transparent'
+                        : 'text-muted-foreground/60 hover:text-muted-foreground border border-transparent'
                     }`}
                   >
                     {p}
@@ -691,7 +691,7 @@ export function ReportView({ report }: ReportViewProps) {
             {/* 52-Week Range Bar */}
             {fin.fiftyTwoWeekLow != null && fin.fiftyTwoWeekHigh != null && fin.currentPrice != null && (
               <div className="px-4 pb-4">
-                <div className="flex justify-between text-[9px] font-mono text-muted-foreground/50 mb-1">
+                <div className="flex justify-between text-[11px] md:text-xs font-mono text-muted-foreground/80 mb-1">
                   <span>52W Low: ${fin.fiftyTwoWeekLow.toFixed(2)}</span>
                   <span>52W High: ${fin.fiftyTwoWeekHigh.toFixed(2)}</span>
                 </div>
