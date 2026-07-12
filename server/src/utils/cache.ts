@@ -1,13 +1,11 @@
+import fs from 'fs';
+import path from 'path';
 import type { FinalReport, NodeError } from '@repo/shared';
 
 /**
- * In-memory report cache with TTL-based expiration.
+ * File-backed report cache with TTL-based expiration.
  *
- * Why in-memory and not Redis?
- * This is a take-home assignment. An in-memory Map is sufficient to
- * demonstrate the caching pattern without adding infra. In production
- * you'd swap this for Redis/DynamoDB with the same interface.
- *
+ * Persists to disk so that it survives server restarts during development.
  * Cache key: lowercased, trimmed company name (e.g. "apple")
  * TTL: configurable, defaults to 1 hour
  */
@@ -24,9 +22,35 @@ const DEFAULT_TTL_MS = 60 * 60 * 1000; // 1 hour
 class ReportCache {
   private cache = new Map<string, CachedReport>();
   private ttlMs: number;
+  private cacheFilePath = path.resolve(process.cwd(), '.report-cache.json');
 
   constructor(ttlMs: number = DEFAULT_TTL_MS) {
     this.ttlMs = ttlMs;
+    this.loadFromDisk();
+  }
+
+  private loadFromDisk() {
+    try {
+      if (fs.existsSync(this.cacheFilePath)) {
+        const raw = fs.readFileSync(this.cacheFilePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        for (const [k, v] of Object.entries(parsed)) {
+          this.cache.set(k, v as CachedReport);
+        }
+        console.log(`[Cache] Loaded ${this.cache.size} entries from disk`);
+      }
+    } catch (err) {
+      console.warn('[Cache] Could not load cache from disk:', err);
+    }
+  }
+
+  private saveToDisk() {
+    try {
+      const obj = Object.fromEntries(this.cache.entries());
+      fs.writeFileSync(this.cacheFilePath, JSON.stringify(obj, null, 2), 'utf-8');
+    } catch (err) {
+      console.warn('[Cache] Could not save cache to disk:', err);
+    }
   }
 
   /** Normalize the cache key */
@@ -44,6 +68,7 @@ class ReportCache {
     // Check TTL
     if (Date.now() - entry.cachedAt > this.ttlMs) {
       this.cache.delete(k);
+      this.saveToDisk();
       console.log(`[Cache] Expired entry for "${companyName}"`);
       return null;
     }
@@ -61,7 +86,8 @@ class ReportCache {
       cachedAt: Date.now(),
       companyName,
     });
-    console.log(`[Cache] Stored report for "${companyName}" (TTL: ${this.ttlMs / 1000}s)`);
+    this.saveToDisk();
+    console.log(`[Cache] Stored report for "${companyName}" (TTL: ${this.ttlMs / 1000}s) and saved to disk`);
   }
 
   /** Check how many entries are cached (for health check) */
@@ -72,6 +98,7 @@ class ReportCache {
   /** Clear all cached entries */
   clear(): void {
     this.cache.clear();
+    this.saveToDisk();
     console.log('[Cache] Cleared all entries');
   }
 }
