@@ -1,6 +1,6 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import type { FinalReport, HistoricalPricePoint } from '@repo/shared';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from 'recharts';
@@ -16,8 +16,10 @@ import {
   Newspaper,
   Brain,
   ChevronRight,
+  ChevronLeft,
   LayoutGrid,
   List,
+  GalleryHorizontalEnd,
 } from 'lucide-react';
 
 interface ReportViewProps {
@@ -65,7 +67,8 @@ function filterByPeriod(prices: HistoricalPricePoint[], period: TimePeriod): His
 export function ReportView({ report }: ReportViewProps) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [chartPeriod, setChartPeriod] = useState<TimePeriod>('1Y');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'list' | 'slides'>('grid');
+  const [slideIndex, setSlideIndex] = useState(0);
   const dec = report.investmentDecision;
   const fin = report.financialData;
   const co = report.companyOverview;
@@ -81,6 +84,23 @@ export function ReportView({ report }: ReportViewProps) {
     const last = chartData[chartData.length - 1].close;
     return { abs: last - first, pct: ((last - first) / first) * 100 };
   }, [chartData]);
+
+  // Keyboard navigation for slides
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (viewMode !== 'slides') return;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSlideIndex((i) => Math.min(i + 1, 20)); // capped; safeIndex handles bounds
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSlideIndex((i) => Math.max(0, i - 1));
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
 
   const handleDownloadPdf = () => {
     // Set a temporary document title for the PDF filename
@@ -134,26 +154,23 @@ export function ReportView({ report }: ReportViewProps) {
         <div className="no-print flex items-center gap-2">
           {/* View Toggle */}
           <div className="flex items-center bg-secondary/50 rounded border border-border/50 p-0.5">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all ${
-                viewMode === 'grid'
-                  ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/30'
-                  : 'text-muted-foreground/50 hover:text-muted-foreground border border-transparent'
-              }`}
-            >
-              <LayoutGrid className="w-3 h-3" /> Grid
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all ${
-                viewMode === 'list'
-                  ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/30'
-                  : 'text-muted-foreground/50 hover:text-muted-foreground border border-transparent'
-              }`}
-            >
-              <List className="w-3 h-3" /> Report
-            </button>
+            {[
+              { mode: 'grid' as const, icon: LayoutGrid, label: 'Grid' },
+              { mode: 'slides' as const, icon: GalleryHorizontalEnd, label: 'Slides' },
+              { mode: 'list' as const, icon: List, label: 'Report' },
+            ].map(({ mode, icon: Icon, label }) => (
+              <button
+                key={mode}
+                onClick={() => { setViewMode(mode); setSlideIndex(0); }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all ${
+                  viewMode === mode
+                    ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/30'
+                    : 'text-muted-foreground/50 hover:text-muted-foreground border border-transparent'
+                }`}
+              >
+                <Icon className="w-3 h-3" /> {label}
+              </button>
+            ))}
           </div>
           <button onClick={handleDownloadPdf} className="flex items-center gap-2 px-4 py-2 bg-neon-cyan/10 border border-neon-cyan/25 rounded font-mono text-xs uppercase tracking-wider text-neon-cyan hover:bg-neon-cyan/20 hover:border-neon-cyan/40 hover:shadow-[0_0_15px_oklch(0.82_0.18_195/0.15)] transition-all active:scale-95">
             <FileDown className="w-3.5 h-3.5" /> Export PDF
@@ -161,7 +178,186 @@ export function ReportView({ report }: ReportViewProps) {
         </div>
       </motion.div>
 
-      {/* ─── DASHBOARD ───────────────────────────────── */}
+      {/* ─── SLIDES VIEW ─────────────────────────────── */}
+      {viewMode === 'slides' && (() => {
+        // Collect all panels as slide entries
+        const slides: { title: string; content: React.ReactNode }[] = [];
+
+        // 1. Verdict + Confidence
+        slides.push({ title: 'VERDICT & CONFIDENCE', content: (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+            <div className={`terminal-panel ${decStyle.bg} p-0`}>
+              <div className="terminal-header"><span className="dot" /><span>VERDICT</span></div>
+              <div className="p-6 text-center space-y-4">
+                <div className={`text-5xl font-black font-mono tracking-tight ${decStyle.text} ${decStyle.glow}`}>{dec.recommendation}</div>
+                <div className="relative mx-auto w-32 h-32">
+                  <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="oklch(0.22 0.015 250)" strokeWidth="5" />
+                    <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" className={decStyle.text} strokeWidth="5" strokeLinecap="round" strokeDasharray={`${(dec.confidence.total / 100) * 264} 264`} style={{ filter: 'drop-shadow(0 0 4px currentColor)' }} />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className={`text-3xl font-black font-mono ${decStyle.text}`}>{dec.confidence.total}</span>
+                    <span className="text-[9px] font-mono text-muted-foreground/50 uppercase">Score</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="terminal-panel">
+              <div className="terminal-header"><span className="dot" /><span>CONFIDENCE MATRIX</span></div>
+              <div className="p-5 space-y-4">
+                {[{ label: 'Data Completeness', value: dec.confidence.dataCompleteness, max: 30 }, { label: 'Source Quality', value: dec.confidence.sourceQuality, max: 20 }, { label: 'Signal Coherence', value: dec.confidence.signalCoherence, max: 30 }, { label: 'Evidence Strength', value: dec.confidence.evidenceStrength, max: 20 }].map((d) => (
+                  <div key={d.label}>
+                    <div className="flex justify-between text-[10px] font-mono text-muted-foreground mb-1.5"><span className="uppercase tracking-wider">{d.label}</span><span className="text-neon-cyan">{d.value}/{d.max}</span></div>
+                    <div className="h-2 bg-border/40 rounded-full overflow-hidden"><div className="h-full bg-neon-cyan rounded-full" style={{ width: `${(d.value / d.max) * 100}%`, boxShadow: '0 0 8px oklch(0.82 0.18 195 / 0.4)' }} /></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )});
+
+        // 2. Financial Metrics
+        if (fin?.available) {
+          slides.push({ title: 'FINANCIAL METRICS', content: (
+            <div className="terminal-panel max-w-3xl mx-auto">
+              <div className="terminal-header"><span className="dot" /><BarChart3 className="w-3 h-3" /><span>FINANCIAL METRICS</span></div>
+              <div className="p-5 grid grid-cols-3 md:grid-cols-4 gap-3">
+                {[{ label: 'Price', value: numFmt(fin.currentPrice, '$') }, { label: 'Mkt Cap', value: fmt(fin.marketCap) }, { label: 'P/E', value: numFmt(fin.peRatio) }, { label: 'PEG', value: numFmt(fin.pegRatio) }, { label: 'P/B', value: numFmt(fin.priceToBook) }, { label: 'D/E', value: numFmt(fin.debtToEquity) }, { label: 'ROE', value: pct(fin.returnOnEquity) }, { label: 'Div Yield', value: pct(fin.dividendYield) }, { label: 'Rev Growth', value: pct(fin.revenueGrowthYoY) }, { label: 'EPS Growth', value: pct(fin.earningsGrowthYoY) }, { label: '52W High', value: numFmt(fin.fiftyTwoWeekHigh, '$') }, { label: '52W Low', value: numFmt(fin.fiftyTwoWeekLow, '$') }].map((m) => (
+                  <div key={m.label} className="p-3 bg-secondary/30 rounded border border-border/40 text-center"><div className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground/60 mb-1">{m.label}</div><div className="text-lg font-bold font-mono text-foreground">{m.value}</div></div>
+                ))}
+              </div>
+            </div>
+          )});
+        }
+
+        // 3. Price Chart
+        if (fin?.available && chartData.length > 0) {
+          slides.push({ title: 'PRICE HISTORY', content: (
+            <div className="terminal-panel max-w-4xl mx-auto">
+              <div className="terminal-header"><span className="dot" /><Activity className="w-3 h-3" /><span>PRICE HISTORY</span>{priceChange && <span className={`ml-2 ${isPositive ? 'text-neon-green' : 'text-neon-red'}`}>{isPositive ? '+' : ''}{priceChange.pct.toFixed(2)}%</span>}<div className="ml-auto flex gap-1">{periods.map((p) => (<button key={p} onClick={() => setChartPeriod(p)} className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-all ${chartPeriod === p ? 'bg-neon-cyan/20 text-neon-cyan border border-neon-cyan/40' : 'text-muted-foreground/40 hover:text-muted-foreground/70 border border-transparent'}`}>{p}</button>))}</div></div>
+              <div className="p-4 h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+                    <defs><linearGradient id="priceGradientSlide" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={isPositive ? 'oklch(0.78 0.22 150)' : 'oklch(0.65 0.22 25)'} stopOpacity={0.3} /><stop offset="100%" stopColor={isPositive ? 'oklch(0.78 0.22 150)' : 'oklch(0.65 0.22 25)'} stopOpacity={0} /></linearGradient></defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.22 0.015 250)" />
+                    <XAxis dataKey="date" tick={{ fontSize: 9, fill: 'oklch(0.55 0 0)', fontFamily: 'JetBrains Mono' }} tickFormatter={(v) => { const d = new Date(v); return `${d.getMonth()+1}/${d.getDate()}`; }} interval="preserveStartEnd" minTickGap={50} />
+                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 9, fill: 'oklch(0.55 0 0)', fontFamily: 'JetBrains Mono' }} tickFormatter={(v) => `$${v}`} width={55} />
+                    <Tooltip contentStyle={{ background: 'oklch(0.12 0.01 250)', border: '1px solid oklch(0.82 0.18 195 / 0.2)', borderRadius: '4px', fontFamily: 'JetBrains Mono', fontSize: '11px' }} labelFormatter={(v) => new Date(v).toLocaleDateString()} formatter={(v: number) => [`$${v.toFixed(2)}`, 'Close']} />
+                    <Area type="monotone" dataKey="close" stroke={isPositive ? 'oklch(0.78 0.22 150)' : 'oklch(0.65 0.22 25)'} strokeWidth={1.5} fill="url(#priceGradientSlide)" dot={false} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )});
+        }
+
+        // 4. Executive Summary
+        slides.push({ title: 'EXECUTIVE SUMMARY', content: (
+          <div className="terminal-panel max-w-3xl mx-auto"><div className="terminal-header"><span className="dot" /><Brain className="w-3 h-3" /><span>EXECUTIVE SUMMARY</span></div><div className="p-6 text-sm text-muted-foreground leading-relaxed space-y-3">{report.executiveSummary.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</div></div>
+        )});
+
+        // 5. Financial Analysis
+        slides.push({ title: 'FINANCIAL ANALYSIS', content: (
+          <div className="terminal-panel max-w-3xl mx-auto"><div className="terminal-header"><span className="dot" /><TrendingUp className="w-3 h-3" /><span>FINANCIAL ANALYSIS</span></div><div className="p-6 text-sm text-muted-foreground leading-relaxed space-y-3">{report.financialAnalysis.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}</div></div>
+        )});
+
+        // 6. Opportunities
+        slides.push({ title: 'GROWTH OPPORTUNITIES', content: (
+          <div className="terminal-panel max-w-3xl mx-auto"><div className="terminal-header"><span className="dot" style={{ background: 'oklch(0.75 0.22 155)', boxShadow: '0 0 6px oklch(0.75 0.22 155)' }} /><Zap className="w-3 h-3 text-neon-green" /><span className="text-neon-green/70">GROWTH OPPORTUNITIES</span></div><div className="p-5 space-y-3">{report.opportunities.length > 0 ? report.opportunities.map((opp, i) => (<div key={i} className="p-4 bg-neon-green/5 border border-neon-green/10 rounded flex items-start gap-3"><ChevronRight className="w-4 h-4 text-neon-green mt-0.5 flex-shrink-0" /><div><h4 className="font-semibold text-foreground/90">{opp.title}</h4><p className="text-xs text-muted-foreground mt-1">{opp.description}</p></div></div>)) : <p className="text-muted-foreground text-xs font-mono">No significant opportunities identified.</p>}</div></div>
+        )});
+
+        // 7. Risks
+        slides.push({ title: 'RISK ASSESSMENT', content: (
+          <div className="terminal-panel max-w-3xl mx-auto"><div className="terminal-header"><span className="dot" style={{ background: 'oklch(0.65 0.22 25)', boxShadow: '0 0 6px oklch(0.65 0.22 25)' }} /><AlertTriangle className="w-3 h-3 text-neon-red" /><span className="text-neon-red/70">RISK ASSESSMENT</span></div><div className="p-5 space-y-3">{report.risks.length > 0 ? report.risks.map((risk, i) => (<div key={i} className="p-4 bg-neon-red/5 border border-neon-red/10 rounded"><div className="flex items-center gap-2 mb-1.5"><span className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold tracking-wider ${risk.severity === 'high' ? 'bg-neon-red/15 text-neon-red border border-neon-red/25' : risk.severity === 'medium' ? 'bg-neon-orange/15 text-neon-orange border border-neon-orange/25' : 'bg-watchlist/15 text-watchlist border border-watchlist/25'}`}>{risk.severity}</span><span className="text-[9px] font-mono text-muted-foreground uppercase tracking-wider">{risk.category}</span></div><h4 className="font-semibold text-foreground/90">{risk.title}</h4><p className="text-xs text-muted-foreground mt-1">{risk.description}</p></div>)) : <p className="text-muted-foreground text-xs font-mono">No significant risks identified.</p>}</div></div>
+        )});
+
+        // 8. Thesis
+        slides.push({ title: 'INVESTMENT THESIS', content: (
+          <div className="terminal-panel max-w-3xl mx-auto"><div className="terminal-header"><span className="dot" /><Shield className="w-3 h-3" /><span>INVESTMENT THESIS</span></div><div className="p-6 space-y-5"><p className="text-sm text-muted-foreground leading-relaxed">{dec.thesisSummary}</p><div><h3 className="text-[10px] font-mono font-bold uppercase tracking-widest text-muted-foreground/60 mb-3">REASONING TRACE</h3><ul className="space-y-2">{dec.reasoning.map((r, i) => (<li key={i} className="text-xs text-muted-foreground flex gap-2 font-mono"><span className="text-neon-cyan flex-shrink-0">[{String(i + 1).padStart(2, '0')}]</span><span>{r}</span></li>))}</ul></div></div></div>
+        )});
+
+        const safeIndex = Math.min(slideIndex, slides.length - 1);
+
+        return (
+          <div className="max-w-5xl mx-auto terminal-panel shadow-2xl bg-black/40 backdrop-blur-xl border border-neon-cyan/20 rounded-xl overflow-hidden mt-4">
+            {/* Window Title Bar */}
+            <div className="flex items-center justify-between px-4 py-2.5 bg-black/60 border-b border-neon-cyan/10">
+              <div className="flex gap-2">
+                <div className="w-3 h-3 rounded-full bg-neon-red/80 shadow-[0_0_8px_oklch(0.65_0.22_25/0.5)]"></div>
+                <div className="w-3 h-3 rounded-full bg-neon-orange/80 shadow-[0_0_8px_oklch(0.78_0.18_65/0.5)]"></div>
+                <div className="w-3 h-3 rounded-full bg-neon-green/80 shadow-[0_0_8px_oklch(0.78_0.22_150/0.5)]"></div>
+              </div>
+              <div className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                <Brain className="w-3 h-3 text-neon-cyan" />
+                SYS.VIEWER - {slides[safeIndex].title}
+              </div>
+              <div className="w-16 text-right font-mono text-[10px] text-neon-cyan bg-neon-cyan/10 px-2 py-0.5 rounded">
+                {safeIndex + 1} / {slides.length}
+              </div>
+            </div>
+
+            {/* Slide Content Area - Fixed Height */}
+            <div className="relative h-[600px] flex flex-col p-6 overflow-hidden bg-gradient-to-b from-transparent to-black/20">
+              <div className="flex-1 flex items-center justify-center w-full relative">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={safeIndex}
+                    initial={{ opacity: 0, scale: 0.96, filter: 'blur(8px)' }}
+                    animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, scale: 1.04, filter: 'blur(8px)' }}
+                    transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                    className="w-full flex justify-center"
+                  >
+                    {slides[safeIndex].content}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              
+              {/* Keyboard hint */}
+              <p className="absolute bottom-4 left-0 right-0 text-center text-[9px] font-mono text-muted-foreground/30 uppercase tracking-widest pointer-events-none">
+                ← → Arrow keys or click dots to navigate
+              </p>
+            </div>
+
+            {/* Navigation Footer */}
+            <div className="flex items-center justify-between px-6 py-4 bg-black/60 border-t border-neon-cyan/10">
+              <button
+                onClick={() => setSlideIndex((i) => Math.max(0, i - 1))}
+                disabled={safeIndex === 0}
+                className="flex items-center gap-2 px-4 py-2 rounded border border-border/50 text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/50 hover:bg-neon-cyan/10 transition-all disabled:opacity-20 font-mono text-xs uppercase"
+              >
+                <ChevronLeft className="w-4 h-4" /> Prev
+              </button>
+
+              {/* Dot indicators */}
+              <div className="flex gap-2">
+                {slides.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setSlideIndex(i)}
+                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                      i === safeIndex
+                        ? 'bg-neon-cyan w-8 shadow-[0_0_12px_oklch(0.82_0.18_195/0.8)]'
+                        : 'bg-border/60 hover:bg-muted-foreground/50 hover:shadow-[0_0_8px_currentColor]'
+                    }`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={() => setSlideIndex((i) => Math.min(slides.length - 1, i + 1))}
+                disabled={safeIndex === slides.length - 1}
+                className="flex items-center gap-2 px-4 py-2 rounded border border-border/50 text-muted-foreground hover:text-neon-cyan hover:border-neon-cyan/50 hover:bg-neon-cyan/10 transition-all disabled:opacity-20 font-mono text-xs uppercase"
+              >
+                Next <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ─── GRID / LIST VIEW ────────────────────────── */}
+      {viewMode !== 'slides' && (
       <motion.div
         ref={dashboardRef}
         variants={containerVariants}
@@ -443,6 +639,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
       </motion.div>
+      )}
     </div>
   );
 }
