@@ -16,6 +16,8 @@ import {
   Newspaper,
   Brain,
   ChevronRight,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 
 interface ReportViewProps {
@@ -63,6 +65,7 @@ function filterByPeriod(prices: HistoricalPricePoint[], period: TimePeriod): His
 export function ReportView({ report }: ReportViewProps) {
   const dashboardRef = useRef<HTMLDivElement>(null);
   const [chartPeriod, setChartPeriod] = useState<TimePeriod>('1Y');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const dec = report.investmentDecision;
   const fin = report.financialData;
   const co = report.companyOverview;
@@ -107,6 +110,11 @@ export function ReportView({ report }: ReportViewProps) {
 
   const periods: TimePeriod[] = ['7D', '1M', '3M', '6M', '1Y'];
 
+  // Grid span helpers — only apply in grid mode
+  const span2 = viewMode === 'grid' ? 'md:col-span-2' : '';
+  const span4 = viewMode === 'grid' ? 'xl:col-span-4' : '';
+  const spanFin = viewMode === 'grid' ? 'xl:col-span-2' : '';
+
   return (
     <div className="w-full max-w-[1600px] mx-auto space-y-3 pb-16">
 
@@ -123,13 +131,47 @@ export function ReportView({ report }: ReportViewProps) {
             <span className="text-muted-foreground/50">Generated {new Date(report.generatedAt).toLocaleString()}</span>
           </p>
         </div>
-        <button onClick={handleDownloadPdf} className="no-print flex items-center gap-2 px-4 py-2 bg-neon-cyan/10 border border-neon-cyan/25 rounded font-mono text-xs uppercase tracking-wider text-neon-cyan hover:bg-neon-cyan/20 hover:border-neon-cyan/40 hover:shadow-[0_0_15px_oklch(0.82_0.18_195/0.15)] transition-all active:scale-95">
-          <FileDown className="w-3.5 h-3.5" /> Export PDF
-        </button>
+        <div className="no-print flex items-center gap-2">
+          {/* View Toggle */}
+          <div className="flex items-center bg-secondary/50 rounded border border-border/50 p-0.5">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all ${
+                viewMode === 'grid'
+                  ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/30'
+                  : 'text-muted-foreground/50 hover:text-muted-foreground border border-transparent'
+              }`}
+            >
+              <LayoutGrid className="w-3 h-3" /> Grid
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-wider transition-all ${
+                viewMode === 'list'
+                  ? 'bg-neon-cyan/15 text-neon-cyan border border-neon-cyan/30'
+                  : 'text-muted-foreground/50 hover:text-muted-foreground border border-transparent'
+              }`}
+            >
+              <List className="w-3 h-3" /> Report
+            </button>
+          </div>
+          <button onClick={handleDownloadPdf} className="flex items-center gap-2 px-4 py-2 bg-neon-cyan/10 border border-neon-cyan/25 rounded font-mono text-xs uppercase tracking-wider text-neon-cyan hover:bg-neon-cyan/20 hover:border-neon-cyan/40 hover:shadow-[0_0_15px_oklch(0.82_0.18_195/0.15)] transition-all active:scale-95">
+            <FileDown className="w-3.5 h-3.5" /> Export PDF
+          </button>
+        </div>
       </motion.div>
 
       {/* ─── DASHBOARD ───────────────────────────────── */}
-      <motion.div ref={dashboardRef} variants={containerVariants} initial="hidden" animate="visible" className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      <motion.div
+        ref={dashboardRef}
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className={viewMode === 'grid'
+          ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3'
+          : 'flex flex-col gap-3 max-w-4xl mx-auto'
+        }
+      >
 
         {/* ── Decision ── */}
         <motion.div variants={itemVariants} className={`terminal-panel ${decStyle.bg} p-0`}>
@@ -173,7 +215,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
         {/* ── Financial Metrics Grid (spans 2 cols) ── */}
-        <motion.div variants={itemVariants} className="terminal-panel xl:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${spanFin}`}>
           <div className="terminal-header"><span className="dot" /><BarChart3 className="w-3 h-3" /><span>FINANCIAL METRICS</span></div>
           {fin?.available ? (
             <div className="p-4 grid grid-cols-4 gap-2">
@@ -248,7 +290,7 @@ export function ReportView({ report }: ReportViewProps) {
 
         {/* ── Price Chart (spans full width) ── */}
         {fin?.available && chartData.length > 0 && (
-          <motion.div variants={itemVariants} className="terminal-panel xl:col-span-4">
+          <motion.div variants={itemVariants} className={`terminal-panel ${span4}`}>
             <div className="terminal-header">
               <span className="dot" />
               <Activity className="w-3 h-3" />
@@ -308,7 +350,7 @@ export function ReportView({ report }: ReportViewProps) {
         )}
 
         {/* ── Executive Summary ── */}
-        <motion.div variants={itemVariants} className="terminal-panel md:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${span2}`}>
           <div className="terminal-header"><span className="dot" /><Brain className="w-3 h-3" /><span>EXECUTIVE SUMMARY</span></div>
           <div className="p-5 text-sm text-muted-foreground leading-relaxed space-y-3">
             {report.executiveSummary.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}
@@ -316,7 +358,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
         {/* ── Financial Analysis ── */}
-        <motion.div variants={itemVariants} className="terminal-panel md:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${span2}`}>
           <div className="terminal-header"><span className="dot" /><TrendingUp className="w-3 h-3" /><span>FINANCIAL ANALYSIS</span></div>
           <div className="p-5 text-sm text-muted-foreground leading-relaxed space-y-3">
             {report.financialAnalysis.split('\n').filter(Boolean).map((p, i) => <p key={i}>{p}</p>)}
@@ -324,7 +366,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
         {/* ── Opportunities ── */}
-        <motion.div variants={itemVariants} className="terminal-panel md:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${span2}`}>
           <div className="terminal-header">
             <span className="dot" style={{ background: 'oklch(0.75 0.22 155)', boxShadow: '0 0 6px oklch(0.75 0.22 155)' }} />
             <Zap className="w-3 h-3 text-neon-green" />
@@ -344,7 +386,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
         {/* ── Risks ── */}
-        <motion.div variants={itemVariants} className="terminal-panel md:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${span2}`}>
           <div className="terminal-header">
             <span className="dot" style={{ background: 'oklch(0.65 0.22 25)', boxShadow: '0 0 6px oklch(0.65 0.22 25)' }} />
             <AlertTriangle className="w-3 h-3 text-neon-red" />
@@ -369,7 +411,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
         {/* ── Investment Thesis ── */}
-        <motion.div variants={itemVariants} className="terminal-panel md:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${span2}`}>
           <div className="terminal-header"><span className="dot" /><Shield className="w-3 h-3" /><span>INVESTMENT THESIS</span></div>
           <div className="p-5 space-y-4">
             <p className="text-sm text-muted-foreground leading-relaxed">{dec.thesisSummary}</p>
@@ -388,7 +430,7 @@ export function ReportView({ report }: ReportViewProps) {
         </motion.div>
 
         {/* ── Sources ── */}
-        <motion.div variants={itemVariants} className="terminal-panel md:col-span-2">
+        <motion.div variants={itemVariants} className={`terminal-panel ${span2}`}>
           <div className="terminal-header"><span className="dot" /><Newspaper className="w-3 h-3" /><span>DATA SOURCES ({report.sources.length})</span></div>
           <div className="p-4 space-y-1.5 max-h-64 overflow-y-auto">
             {report.sources.map((s, i) => (
